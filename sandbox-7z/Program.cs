@@ -32,9 +32,9 @@ namespace sandbox_7z
         {
             Directory.CreateDirectory("_test");
 
-            bool writeArchive = true;
+            bool writeArchive = false;
             bool useOldWriter = false;
-            bool readArchive = true;
+            bool readArchive = false;
             bool useOldReader = false;
 
             if (writeArchive)
@@ -66,8 +66,8 @@ namespace sandbox_7z
                             ManagedLzma.SevenZip.Writer.EncoderNodeDefinition node2 = null;
                             //node1 = encoder.CreateEncoder(ManagedLzma.SevenZip.Encoders.CopyEncoderSettings.Instance);
                             //node1 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Encoders.LzmaEncoderSettings(new ManagedLzma.LZMA.EncoderSettings()));
-                            //node1 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Encoders.Lzma2EncoderSettings(new ManagedLzma.LZMA2.EncoderSettings()));
-                            node2 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Writer.AesEncoderSettings(ManagedLzma.PasswordStorage.Create("test")));
+                            node1 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Writer.Lzma2EncoderSettings(new ManagedLzma.LZMA2.EncoderSettings()));
+                            //node2 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Writer.AesEncoderSettings(ManagedLzma.PasswordStorage.Create("test")));
                             if (node1 != null && node2 != null)
                             {
                                 encoder.Connect(encoder.GetContentSource(), node1.GetInput(0));
@@ -113,7 +113,8 @@ namespace sandbox_7z
                                         using (var fileStream = file.OpenRead())
                                         {
                                             var result = await session.AppendStream(fileStream, true);
-                                            metadata.AppendFile(file.Name, result.Length, result.Checksum, file.Attributes, file.CreationTimeUtc, file.LastWriteTimeUtc, file.LastAccessTimeUtc);
+                                            string relativePath = Path.Combine(@"myFolder1\subfolder\", file.Name); // This will create a folder myFolder
+                                            metadata.AppendFile(relativePath, result.Length, result.Checksum, file.Attributes, file.CreationTimeUtc, file.LastWriteTimeUtc, file.LastAccessTimeUtc);
                                         }
                                     }
 
@@ -143,6 +144,7 @@ namespace sandbox_7z
                 }
                 else
                 {
+                    //var file = new FileStream(@"D:\Online_Balancer_2021_02_18__16_40_46.ABTGo.7z", FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
                     var file = new FileStream(@"_test\test.7z", FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
                     var mdReader = new ManagedLzma.SevenZip.FileModel.ArchiveFileModelMetadataReader();
                     mdReader.EnablePosixFileAttributeExtension = true; // enables an unofficial extension; should be safe to always set to true if you need to deal with those kind of files
@@ -175,6 +177,106 @@ namespace sandbox_7z
                     }
                 }
             }
+
+            //ninad2110 : Set to true for packing an archieve, false for unpacking
+            bool pack = true;
+
+            if (pack)
+            {
+                CreateArchieve(@"..\..\Example\Sample", @"..\..\Example\Pack", "trial.7z");
+            }
+            else
+            {
+                UnpackArchive(@"..\..\Example\Pack\trial.7z", @"..\..\Example\Unpack");
+            }
+        }
+
+
+        public static bool CreateArchieve(string sourceFolder, string destinationFolder, string outputFilename, string password = "")
+        {
+            Task.Run(async delegate {
+
+                string file7z = Path.Combine(destinationFolder, outputFilename);
+                using (var archiveStream = new FileStream(file7z, FileMode.Create, FileAccess.ReadWrite, FileShare.Delete))
+                using (var archiveWriter = ManagedLzma.SevenZip.Writer.ArchiveWriter.Create(archiveStream, false))
+                {
+                    var encoder = new ManagedLzma.SevenZip.Writer.EncoderDefinition();
+                    ManagedLzma.SevenZip.Writer.EncoderNodeDefinition node1 = null;
+                    ManagedLzma.SevenZip.Writer.EncoderNodeDefinition node2 = null;
+                    //node1 = encoder.CreateEncoder(ManagedLzma.SevenZip.Encoders.CopyEncoderSettings.Instance);
+                    //node1 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Encoders.LzmaEncoderSettings(new ManagedLzma.LZMA.EncoderSettings()));
+                    //node1 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Encoders.Lzma2EncoderSettings(new ManagedLzma.LZMA2.EncoderSettings()));
+
+
+                    node1 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Writer.Lzma2EncoderSettings(new ManagedLzma.LZMA2.EncoderSettings()));
+
+                    if (!string.IsNullOrEmpty(password))
+                    {
+                        node2 = encoder.CreateEncoder(new ManagedLzma.SevenZip.Writer.AesEncoderSettings(ManagedLzma.PasswordStorage.Create(password)));
+                    }
+
+
+                    if (node1 != null && node2 != null)
+                    {
+                        encoder.Connect(encoder.GetContentSource(), node1.GetInput(0));
+                        encoder.Connect(node1.GetOutput(0), node2.GetInput(0));
+                        encoder.Connect(node2.GetOutput(0), encoder.CreateStorageSink());
+                    }
+                    else
+                    {
+                        encoder.Connect(encoder.GetContentSource(), (node1 ?? node2).GetInput(0));
+                        encoder.Connect((node1 ?? node2).GetOutput(0), encoder.CreateStorageSink());
+                    }
+                    encoder.Complete();
+
+                    var metadata = new ManagedLzma.SevenZip.Writer.ArchiveMetadataRecorder();
+
+                    var directory = new DirectoryInfo(sourceFolder);
+
+                    bool useDistinctEncoders = false;
+
+                    if (useDistinctEncoders)
+                    {
+                        foreach (var file in directory.EnumerateFiles())
+                        {
+                            using (var session = archiveWriter.BeginEncoding(encoder, true))
+                            {
+                                using (var fileStream = file.OpenRead())
+                                {
+                                    var result = await session.AppendStream(fileStream, true);
+                                    metadata.AppendFile(file.Name, result.Length, result.Checksum, file.Attributes, file.CreationTimeUtc, file.LastWriteTimeUtc, file.LastAccessTimeUtc);
+                                }
+
+                                // TODO: ensure that everything still aborts properly if we don't call complete
+                                await session.Complete();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        using (var session = archiveWriter.BeginEncoding(encoder, true))
+                        {
+                            foreach (var file in directory.EnumerateFiles("*",SearchOption.AllDirectories))
+                            {
+                                using (var fileStream = file.OpenRead())
+                                {
+                                    var result = await session.AppendStream(fileStream, true);
+                                    string relativePath = Path.GetFullPath(file.FullName).Substring(Path.GetFullPath(sourceFolder).Length + 1);
+                                    metadata.AppendFile(relativePath, result.Length, result.Checksum, file.Attributes, file.CreationTimeUtc, file.LastWriteTimeUtc, file.LastAccessTimeUtc);
+                                }
+                            }
+
+                            // TODO: ensure that everything still aborts properly if we don't call complete
+                            await session.Complete();
+                        }
+                    }
+
+                    await archiveWriter.WriteMetadata(metadata);
+                    await archiveWriter.WriteHeader();
+                }
+            }).GetAwaiter().GetResult();
+
+            return true; 
         }
 
         private static void UnpackArchive(string archiveFileName, string targetDirectory, string password = null)

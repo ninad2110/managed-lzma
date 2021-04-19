@@ -26,7 +26,7 @@ namespace ManagedLzma.LZMA
         {
             mReduceSize = Int64.MaxValue;
             mWriteEndMark = false;
-            SetLevel(5);
+            SetLevel(1); // ninad2110 => level 5-> 1 LZMA:16
         }
 
         public void SetLevel(int level)
