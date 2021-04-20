@@ -39,7 +39,8 @@ namespace sandbox_7z
             }
             else
             {
-                UnpackArchive(@"..\..\Example\Pack\trial.7z", @"..\..\Example\Unpack");
+                UnpackArchive(@"..\..\Example\Pack\Data.7z", @"..\..\Example\Unpack");
+                
             }
         }
 
