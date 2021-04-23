@@ -36,11 +36,13 @@ namespace sandbox_7z
             if (pack)
             {
                 CreateArchieve(@"..\..\Example\Sample", @"..\..\Example\Pack", "trial.7z");
+                //CreateArchieve(@"D:\PRJ_1N8ZQJ26GXIE27DVJ2JCDH5LW", @"..\..\Example\Pack", "my.7z");
             }
             else
             {
-                UnpackArchive(@"..\..\Example\Pack\Data.7z", @"..\..\Example\Unpack");
-                
+                UnpackArchive(@"..\..\Example\Pack\trial.7z", @"..\..\Example\Unpack");
+            
+                //UnpackArchive(@"D:\MyArchive.7z", @"..\..\Example\Unpack");
             }
         }
 
@@ -104,12 +106,13 @@ namespace sandbox_7z
                     {
                         using (var session = archiveWriter.BeginEncoding(encoder, true))
                         {
+                            int offset = Path.GetFullPath(directory.Parent.FullName).Length + 1; 
                             foreach (var file in directory.EnumerateFiles("*",SearchOption.AllDirectories))
                             {
                                 using (var fileStream = file.OpenRead())
                                 {
                                     var result = await session.AppendStream(fileStream, true);
-                                    string relativePath = Path.GetFullPath(file.FullName).Substring(Path.GetFullPath(sourceFolder).Length + 1);
+                                    string relativePath = Path.GetFullPath(file.FullName).Substring(offset);
                                     metadata.AppendFile(relativePath, result.Length, result.Checksum, file.Attributes, file.CreationTimeUtc, file.LastWriteTimeUtc, file.LastAccessTimeUtc);
                                 }
                             }
